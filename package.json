@@ -1,6 +1,5 @@
 {
-  "name": "code-push-cli-jolt",
-  "private": true,
+  "name": "@joltup/jolt-code-push-cli",
   "version": "1.12.4-beta.8",
   "description": "Management CLI for the CodePush service",
   "main": "./script/cli.js",
