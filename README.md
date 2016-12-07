@@ -294,6 +294,7 @@ code-push release <appName> <updateContents> <targetBinaryVersion>
 [--description <description>]
 [--disabled <disabled>]
 [--mandatory]
+[--noDuplicateReleaseError]
 [--rollout <rolloutPercentage>]
 ```
 
@@ -337,7 +338,7 @@ If you ever want an update to target multiple versions of the app store binary, 
 | `^1.2.3`         | Equivalent to `>=1.2.3 <2.0.0`                                                         |
 
 *NOTE: If your semver expression starts with a special shell character or operator such as `>`, `^`, or **
-*, the command may not execute correctly if you do not wrap the value in quotes as the shell will not supply the right values to our CLI process. Therefore, it is best to wrap your `targetBinaryVersion` parameter in double quotes when calling the `release` command, e.g. `code-push release MyApp updateContents ">1.2.3"`.*
+*, the command may not execute correctly if you do not wrap the value in quotes as the shell will not supply the right values to our CLI process. Therefore, it is best to wrap your `targetBinaryVersion` parameter in double quotes when calling the `release` command, e.g. `code-push release MyApp-iOS updateContents ">1.2.3"`.*
 
 The following table outlines the version value that CodePush expects your update's semver range to satisfy for each respective app type:
 
@@ -362,6 +363,12 @@ This provides an optional "change log" for the deployment. The value is simply r
 
 *NOTE: This parameter can be set using either "--description" or "-desc"*
 
+#### Disabled parameter
+
+This specifies whether an update should be downloadable by end users or not. If left unspecified, the update will not be disabled (i.e. users will download it the moment your app calls `sync`). This parameter can be valuable if you want to release an update that isn't immediately available, until you expicitly [patch it](#patching-releases) when you want end users to be able to download it (e.g. an announcement blog post went live).
+
+*NOTE: This parameter can be set using either "--disabled" or "-x"*
+
 #### Mandatory parameter
 
 This specifies whether the update should be considered mandatory or not (e.g. it includes a critical security fix). This attribute is simply round tripped to the client, who can then decide if and how they would like to enforce it.
@@ -384,6 +391,10 @@ If you never release an update that is marked as mandatory, then the above behav
 
 *NOTE: This parameter can be set using either `--mandatory` or `-m`*
 
+#### No duplicate release error parameter
+
+This specifies that if the update is identical to the latest release on the deployment, the CLI should generate a warning instead of an error. This is useful for continuous integration scenarios where it is expected that small modifications may trigger releases where no production code has changed.
+
 #### Rollout parameter
 
 **IMPORTANT: In order for this parameter to actually take affect, your end users need to be running version `1.6.0-beta+` (for Cordova) or `1.9.0-beta+` (for React Native) of the CodePush plugin. If you release an update that specifies a rollout property, no end user running an older version of the Cordova or React Native plugins will be eligible for the update. Therefore, until you have adopted the neccessary version of the platform-specific CodePush plugin (as previously mentioned), we would advise not setting a rollout value on your releases, since no one would end up receiving it.**
@@ -400,12 +411,6 @@ This specifies the percentage of users (as an integer between `1` and `100`) tha
 
 *NOTE: This parameter can be set using either `--rollout` or `-r`*
 
-#### Disabled parameter
-
-This specifies whether an update should be downloadable by end users or not. If left unspecified, the update will not be disabled (i.e. users will download it the moment your app calls `sync`). This parameter can be valuable if you want to release an update that isn't immediately available, until you expicitly [patch it](#patching-releases) when you want end users to be able to download it (e.g. an announcement blog post went live).
-
-*NOTE: This parameter can be set using either "--disabled" or "-x"*
-
 ### Releasing Updates (React Native)
 
 ```shell
@@ -418,6 +423,7 @@ code-push release-react <appName> <platform>
 [--entryFile <entryFile>]
 [--gradleFile <gradleFile>]
 [--mandatory]
+[--noDuplicateReleaseError]
 [--plistFile <plistFile>]
 [--plistFilePrefix <plistFilePrefix>]
 [--sourcemapOutput <sourcemapOutput>]
@@ -442,13 +448,13 @@ react-native bundle --platform ios \
 --assets-dest ./CodePush \
 --dev false
 
-code-push release MyApp ./CodePush 1.0.0
+code-push release MyApp-iOS ./CodePush 1.0.0
 ```
 
 Achieving the equivalent behavior with the `release-react` command would simply require the following command, which is generally less error-prone:
 
 ```shell
-code-push release-react MyApp ios
+code-push release-react MyApp-iOS ios
 ```
 
 *NOTE: We believe that the `release-react` command should be valuable for most React Native developers, so if you're finding that it isn't flexible enough or missing a key feature, please don't hesistate to [let us know](mailto:codepushfeed@microsoft.com), so that we can improve it!*
@@ -472,6 +478,10 @@ This is the same parameter as the one described in the [above section](#descript
 #### Mandatory parameter
 
 This is the same parameter as the one described in the [above section](#mandatory-parameter).
+
+#### No duplicate release error parameter
+
+This is the same parameter as the one described in the [above section](#no-duplicate-release-error-parameter).
 
 #### Rollout parameter
 
@@ -508,8 +518,8 @@ This specifies the relative path to the app's root/entry JavaScript file. If lef
 This specifies the relative path to the `build.gradle` file that the CLI should use when attempting to auto-detect the target binary version for the release. This parameter is only meant for advanced scenarios, since the CLI will automatically be able to find your `build.grade` file in "standard" React Native projects. However, if your gradle file is located in an arbitrary location, that the CLI can't discover, then using this parameter allows you to continue releasing CodePush updates, without needing to explicitly set the `--targetBinaryVersion` parameter. Since `build.gradle` is a required file name, specifying the path to the containing folder or the full path to the file itself will both achieve the same effect.
 
 ```shell
-code-push release-react foo android -p "./foo/bar/"
-code-push release-react foo android -p "./foo/bar/build.gradle"
+code-push release-react MyApp-Android android -p "./foo/bar/"
+code-push release-react MyApp-Android android -p "./foo/bar/build.gradle"
 ```
 
 #### Plist file parameter (iOS only)
@@ -517,7 +527,7 @@ code-push release-react foo android -p "./foo/bar/build.gradle"
 This specifies the relative path to the `Info.plist` file that the CLI should use when attempting to auto-detect the target binary version for the release. This parameter is only meant for advanced scenarios, since the CLI will automatically be able to find your `Info.plist` file in "standard" React Native projects, and you can use the `--plistFilePrefix` parameter in order to support per-environment plist files (e.g. `STAGING-Info.plist`). However, if your plist is located in an arbitrary location, that the CLI can't discover, then using this parameter allows you to continue releasing CodePush updates, without needing to explicitly set the `--targetBinaryVersion` parameter.
 
 ```shell
-code-push release-react foo ios -p "./foo/bar/MyFile.plist"
+code-push release-react MyApp-iOS ios -p "./foo/bar/MyFile.plist"
 ```
 
 *NOTE: This parameter can be set using either --plistFile or -p*
@@ -529,11 +539,11 @@ This specifies the file name prefix of the `Info.plist` file that that CLI shoul
 ```shell
 # Auto-detect the target binary version of this release by looking up the
 # app version within the STAGING-Info.plist file in either the ./ios or ./ios/<APP> directories.
-code-push release-react foo ios --pre "STAGING"
+code-push release-react MyApp-iOS ios --pre "STAGING"
 
 # Tell the CLI to use your dev plist (`DEV-Info.plist`).
 # Note that the hyphen separator can be explicitly stated.
-code-push release-react foo ios --pre "DEV-"
+code-push release-react MyApp-iOS ios --pre "DEV-"
 ```
 
 *NOTE: This parameter can be set using either --plistFilePrefix or --pre*
@@ -551,6 +561,7 @@ code-push release-cordova <appName> <platform>
 [--deploymentName <deploymentName>]
 [--description <description>]
 [--mandatory]
+[--noDuplicateReleaseError]
 [--targetBinaryVersion <targetBinaryVersion>]
 [--rollout <rolloutPercentage>]
 [--build]
@@ -566,13 +577,13 @@ To illustrate the difference that the `release-cordova` command can make, the fo
 
 ```shell
 cordova prepare ios
-code-push release MyApp ./platforms/ios/www 1.0.0
+code-push release MyApp-iOS ./platforms/ios/www 1.0.0
 ```
 
 Achieving the equivalent behavior with the `release-cordova` command would simply require the following command, which is generally less error-prone:
 
 ```shell
-code-push release-cordova MyApp ios
+code-push release-cordova MyApp-iOS ios
 ```
 
 *NOTE: We believe that the `release-cordova` command should be valuable for most Cordova developers, so if you're finding that it isn't flexible enough or missing a key feature, please don't hesistate to [let us know](mailto:codepushfeed@microsoft.com), so that we can improve it.*
@@ -596,6 +607,10 @@ This is the same parameter as the one described in the [above section](#descript
 #### Mandatory parameter
 
 This is the same parameter as the one described in the [above section](#mandatory-parameter).
+
+#### No duplicate release error parameter
+
+This is the same parameter as the one described in the [above section](#no-duplicate-release-error-parameter).
 
 #### Rollout parameter
 
@@ -657,10 +672,10 @@ Aside from the `appName` and `deploymentName`, all parameters are optional, and 
 
 ```shell
 # Mark the latest production release as mandatory
-code-push patch MyApp Production -m
+code-push patch MyApp-iOS Production -m
 
 # Increase the rollout for v23 to 50%
-code-push patch MyApp Production -l v23 -rollout 50%
+code-push patch MyApp-iOS Production -l v23 -rollout 50%
 ```
 
 ### Label parameter
@@ -694,7 +709,7 @@ This is the same parameter as the one described in the [above section](#target-b
 ```shell
 # Add a "max binary version" to an existing release
 # by scoping its eligibility to users running >= 1.0.5
-code-push patch MyApp Staging -t "1.0.0 - 1.0.5"
+code-push patch MyApp-iOS Staging -t "1.0.0 - 1.0.5"
 ```
 
 ## Promoting Updates
@@ -706,6 +721,7 @@ code-push promote <appName> <sourceDeploymentName> <destDeploymentName>
 [--description <description>]
 [--disabled <disabled>]
 [--mandatory]
+[--noDuplicateReleaseError]
 [--rollout <rolloutPercentage>]
 [--targetBinaryVersion <targetBinaryVersion]
 ```
@@ -722,13 +738,17 @@ We recommend that all users take advantage of the automatically created `Staging
 
 This is the same parameter as the one described in the [above section](#description-parameter), and simply allows you to override the description that will be used for the promoted release. If unspecified, the new release will inherit the description from the release being promoted.
 
-#### Disabled parameter
+### Disabled parameter
 
 This is the same parameter as the one described in the [above section](#disabled-parameter), and simply allows you to override the value of the disabled flag that will be used for the promoted release. If unspecified, the new release will inherit the disabled property from the release being promoted.
 
 ### Mandatory parameter
 
 This is the same parameter as the one described in the [above section](#mandatory-parameter), and simply allows you to override the mandatory flag that will be used for the promoted release. If unspecified, the new release will inherit the mandatory property from the release being promoted.
+
+### No duplicate release error parameter
+
+This is the same parameter as the one described in the [above section](#no-duplicate-release-error-parameter).
 
 ### Rollout parameter
 
@@ -741,7 +761,7 @@ This is the same parameter as the one described in the [above section](#target-b
 ```shell
 # Promote the release to production and make it
 # available to all versions using that deployment
-code-push promote MyApp Staging Production -t "*"
+code-push promote MyApp-iOS Staging Production -t "*"
 ```
 
 ## Rolling Back Updates
@@ -750,7 +770,7 @@ A deployment's release history is immutable, so you cannot delete or remove an u
 
 ```
 code-push rollback <appName> <deploymentName>
-code-push rollback MyApp Production
+code-push rollback MyApp-iOS Production
 ```
 
 This has the effect of creating a new release for the deployment that includes the **exact same code and metadata** as the version prior to the latest one. For example, imagine that you released the following updates to your app:
@@ -775,7 +795,7 @@ End-users that had already acquired `v3` would now be "moved back" to `v2` when 
 If you would like to rollback a deployment to a release other than the previous (e.g. `v3` -> `v2`), you can specify the optional `--targetRelease` parameter:
 
 ```
-code-push rollback MyApp Production --targetRelease v34
+code-push rollback MyApp-iOS Production --targetRelease v34
 ```
 
 *NOTE: The release produced by a rollback will be annotated in the output of the `deployment history` command to help identify them more easily.*
