@@ -925,42 +925,9 @@ exports.release = function (command) {
     }
     throwForInvalidSemverRange(command.appStoreVersion);
     var filePath = command.package;
-    var getPackageFilePromise;
     var isSingleFilePackage = true;
     if (fs.lstatSync(filePath).isDirectory()) {
         isSingleFilePackage = false;
-        getPackageFilePromise = Promise(function (resolve, reject) {
-            var directoryPath = filePath;
-            recursiveFs.readdirr(directoryPath, function (error, directories, files) {
-                if (error) {
-                    reject(error);
-                    return;
-                }
-                var baseDirectoryPath = path.dirname(directoryPath);
-                var fileName = generateRandomFilename(15) + ".zip";
-                var zipFile = new yazl.ZipFile();
-                var writeStream = fs.createWriteStream(fileName);
-                zipFile.outputStream.pipe(writeStream)
-                    .on("error", function (error) {
-                    reject(error);
-                })
-                    .on("close", function () {
-                    filePath = path.join(process.cwd(), fileName);
-                    resolve({ isTemporary: true, path: filePath });
-                });
-                for (var i = 0; i < files.length; ++i) {
-                    var file = files[i];
-                    var relativePath = path.relative(baseDirectoryPath, file);
-                    // yazl does not like backslash (\) in the metadata path.
-                    relativePath = slash(relativePath);
-                    zipFile.addFile(file, relativePath);
-                }
-                zipFile.end();
-            });
-        });
-    }
-    else {
-        getPackageFilePromise = Q({ isTemporary: false, path: filePath });
     }
     var lastTotalProgress = 0;
     var progressBar = new progress("Upload progress:[:bar] :percent :etas", {
@@ -979,11 +946,14 @@ exports.release = function (command) {
         isMandatory: command.mandatory,
         rollout: command.rollout
     };
-    return getPackageFilePromise
-        .then(function (file) {
-        exports.log("created zip file... also, ryan is STILL awesome");
-        return true;
-    });
+    return exports.sdk.isAuthenticated(true)
+        .then(function (isAuth) {
+        return exports.sdk.release(command.appName, command.deploymentName, filePath, command.appStoreVersion, updateMetadata, uploadProgress);
+    })
+        .then(function () {
+        exports.log("Successfully released an update containing the \"" + command.package + "\" " + (isSingleFilePackage ? "file" : "directory") + " to the \"" + command.deploymentName + "\" deployment of the \"" + command.appName + "\" app.");
+    })
+        .catch(function (err) { return releaseErrorHandler(err, command); });
 };
 exports.releaseCordova = function (command) {
     var platform = command.platform.toLowerCase();
