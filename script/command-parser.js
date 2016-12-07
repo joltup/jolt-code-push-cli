@@ -312,6 +312,7 @@ var argv = yargs.usage(USAGE_PREFIX + " <command>")
         .option("description", { alias: "des", default: null, demand: false, description: "Description of the changes made to the app with this release. If omitted, the description from the release being promoted will be used.", type: "string" })
         .option("disabled", { alias: "x", default: null, demand: false, description: "Specifies whether this release should be immediately downloadable. If omitted, the disabled attribute from the release being promoted will be used.", type: "boolean" })
         .option("mandatory", { alias: "m", default: null, demand: false, description: "Specifies whether this release should be considered mandatory. If omitted, the mandatory property from the release being promoted will be used.", type: "boolean" })
+        .option("noDuplicateReleaseError", { default: false, demand: false, description: "When this flag is set, promoting a package that is identical to the latest release on the target deployment will produce a warning instead of an error", type: "boolean" })
         .option("rollout", { alias: "r", default: "100%", demand: false, description: "Percentage of users this update should be immediately available to", type: "string" })
         .option("targetBinaryVersion", { alias: "t", default: null, demand: false, description: "Semver expression that specifies the binary app version(s) this release is targeting (e.g. 1.1.0, ~1.2.3). If omitted, the target binary version property from the release being promoted will be used.", type: "string" })
         .check(function (argv, aliases) { return isValidRollout(argv); });
@@ -339,6 +340,7 @@ var argv = yargs.usage(USAGE_PREFIX + " <command>")
         .option("description", { alias: "des", default: null, demand: false, description: "Description of the changes made to the app in this release", type: "string" })
         .option("disabled", { alias: "x", default: false, demand: false, description: "Specifies whether this release should be immediately downloadable", type: "boolean" })
         .option("mandatory", { alias: "m", default: false, demand: false, description: "Specifies whether this release should be considered mandatory", type: "boolean" })
+        .option("noDuplicateReleaseError", { default: false, demand: false, description: "When this flag is set, releasing a package that is identical to the latest release will produce a warning instead of an error", type: "boolean" })
         .option("rollout", { alias: "r", default: "100%", demand: false, description: "Percentage of users this release should be available to", type: "string" })
         .check(function (argv, aliases) { return checkValidReleaseOptions(argv); });
     addCommonConfiguration(yargs);
@@ -353,6 +355,7 @@ var argv = yargs.usage(USAGE_PREFIX + " <command>")
         .option("description", { alias: "des", default: null, demand: false, description: "Description of the changes made to the app in this release", type: "string" })
         .option("disabled", { alias: "x", default: false, demand: false, description: "Specifies whether this release should be immediately downloadable", type: "boolean" })
         .option("mandatory", { alias: "m", default: false, demand: false, description: "Specifies whether this release should be considered mandatory", type: "boolean" })
+        .option("noDuplicateReleaseError", { default: false, demand: false, description: "When this flag is set, releasing a package that is identical to the latest release will produce a warning instead of an error", type: "boolean" })
         .option("rollout", { alias: "r", default: "100%", demand: false, description: "Percentage of users this release should be immediately available to", type: "string" })
         .option("targetBinaryVersion", { alias: "t", default: null, demand: false, description: "Semver expression that specifies the binary app version(s) this release is targeting (e.g. 1.1.0, ~1.2.3). If omitted, the release will target the exact version specified in the config.xml file.", type: "string" })
         .check(function (argv, aliases) { return checkValidReleaseOptions(argv); });
@@ -372,6 +375,7 @@ var argv = yargs.usage(USAGE_PREFIX + " <command>")
         .option("entryFile", { alias: "e", default: null, demand: false, description: "Path to the app's entry Javascript file. If omitted, \"index.<platform>.js\" and then \"index.js\" will be used (if they exist)", type: "string" })
         .option("gradleFile", { alias: "g", default: null, demand: false, description: "Path to the gradle file which specifies the binary version you want to target this release at (android only)." })
         .option("mandatory", { alias: "m", default: false, demand: false, description: "Specifies whether this release should be considered mandatory", type: "boolean" })
+        .option("noDuplicateReleaseError", { default: false, demand: false, description: "When this flag is set, releasing a package that is identical to the latest release will produce a warning instead of an error", type: "boolean" })
         .option("plistFile", { alias: "p", default: null, demand: false, description: "Path to the plist file which specifies the binary version you want to target this release at (iOS only)." })
         .option("plistFilePrefix", { alias: "pre", default: null, demand: false, description: "Prefix to append to the file name when attempting to find your app's Info.plist file (iOS only)." })
         .option("rollout", { alias: "r", default: "100%", demand: false, description: "Percentage of users this release should be immediately available to", type: "string" })
@@ -635,6 +639,7 @@ function createCommand() {
                     deploymentPromoteCommand.description = argv["description"] ? backslash(argv["description"]) : "";
                     deploymentPromoteCommand.disabled = argv["disabled"];
                     deploymentPromoteCommand.mandatory = argv["mandatory"];
+                    deploymentPromoteCommand.noDuplicateReleaseError = argv["noDuplicateReleaseError"];
                     deploymentPromoteCommand.rollout = getRolloutValue(argv["rollout"]);
                     deploymentPromoteCommand.appStoreVersion = argv["targetBinaryVersion"];
                 }
@@ -657,6 +662,7 @@ function createCommand() {
                     releaseCommand.description = argv["description"] ? backslash(argv["description"]) : "";
                     releaseCommand.disabled = argv["disabled"];
                     releaseCommand.mandatory = argv["mandatory"];
+                    releaseCommand.noDuplicateReleaseError = argv["noDuplicateReleaseError"];
                     releaseCommand.rollout = getRolloutValue(argv["rollout"]);
                 }
                 break;
@@ -671,6 +677,7 @@ function createCommand() {
                     releaseCordovaCommand.description = argv["description"] ? backslash(argv["description"]) : "";
                     releaseCordovaCommand.disabled = argv["disabled"];
                     releaseCordovaCommand.mandatory = argv["mandatory"];
+                    releaseCordovaCommand.noDuplicateReleaseError = argv["noDuplicateReleaseError"];
                     releaseCordovaCommand.rollout = getRolloutValue(argv["rollout"]);
                     releaseCordovaCommand.appStoreVersion = argv["targetBinaryVersion"];
                 }
@@ -690,6 +697,7 @@ function createCommand() {
                     releaseReactCommand.entryFile = argv["entryFile"];
                     releaseReactCommand.gradleFile = argv["gradleFile"];
                     releaseReactCommand.mandatory = argv["mandatory"];
+                    releaseReactCommand.noDuplicateReleaseError = argv["noDuplicateReleaseError"];
                     releaseReactCommand.plistFile = argv["plistFile"];
                     releaseReactCommand.plistFilePrefix = argv["plistFilePrefix"];
                     releaseReactCommand.rollout = getRolloutValue(argv["rollout"]);

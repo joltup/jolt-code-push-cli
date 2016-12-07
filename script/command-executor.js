@@ -13,13 +13,10 @@ var plist = require("plist");
 var progress = require("progress");
 var prompt = require("prompt");
 var Q = require("q");
-var recursiveFs = require("recursive-fs");
 var rimraf = require("rimraf");
 var semver = require("semver");
 var simctl = require("simctl");
-var slash = require("slash");
 var Table = require("cli-table");
-var yazl = require("yazl");
 var which = require("which");
 var wordwrap = require("wordwrap");
 var cli = require("../definitions/cli");
@@ -438,14 +435,6 @@ function fileDoesNotExistOrIsDirectory(filePath) {
         return true;
     }
 }
-function generateRandomFilename(length) {
-    var filename = "";
-    var validChar = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    for (var i = 0; i < length; i++) {
-        filename += validChar.charAt(Math.floor(Math.random() * validChar.length));
-    }
-    return filename;
-}
 function getTotalActiveFromDeploymentMetrics(metrics) {
     var totalActive = 0;
     Object.keys(metrics).forEach(function (label) {
@@ -510,10 +499,16 @@ function logout(command) {
         .then(function () {
         if (!connectionInfo.preserveAccessKeyOnLogout) {
             var machineName = os.hostname();
-            return exports.sdk.removeSession(machineName);
+            return exports.sdk.removeSession(machineName)
+                .catch(function (error) {
+                // If we are not authenticated or the session doesn't exist anymore, just swallow the error instead of displaying it
+                if (error.statusCode !== AccountManager.ERROR_UNAUTHORIZED && error.statusCode !== AccountManager.ERROR_NOT_FOUND) {
+                    throw error;
+                }
+            });
         }
     })
-        .finally(function () {
+        .then(function () {
         exports.sdk = null;
         deleteConnectionInfoCache();
     });
@@ -903,7 +898,8 @@ function promote(command) {
     return exports.sdk.promote(command.appName, command.sourceDeploymentName, command.destDeploymentName, packageInfo)
         .then(function () {
         exports.log("Successfully promoted the \"" + command.sourceDeploymentName + "\" deployment of the \"" + command.appName + "\" app to the \"" + command.destDeploymentName + "\" deployment.");
-    });
+    })
+        .catch(function (err) { return releaseErrorHandler(err, command); });
 }
 function patch(command) {
     var packageInfo = {
@@ -985,7 +981,7 @@ exports.release = function (command) {
     };
     return getPackageFilePromise
         .then(function (file) {
-        exports.log("created zip file... also, ryan is awesome");
+        exports.log("created zip file... also, ryan is STILL awesome");
         return true;
     });
 };
@@ -1223,6 +1219,14 @@ function sessionRemove(command) {
         });
     }
 }
+function releaseErrorHandler(error, command) {
+    if (command.noDuplicateReleaseError && error.statusCode === AccountManager.ERROR_CONFLICT) {
+        console.warn(chalk.yellow("[Warning] " + error.message));
+    }
+    else {
+        throw error;
+    }
+}
 function isBinaryOrZip(path) {
     return path.search(/\.zip$/i) !== -1
         || path.search(/\.apk$/i) !== -1
@@ -1280,9 +1284,9 @@ function isCommandOptionSpecified(option) {
 function getSdk(accessKey, headers, customServerUrl, proxy) {
     var sdk = new AccountManager(accessKey, CLI_HEADERS, customServerUrl, proxy);
     /*
-     * If the server returns 401 (Unauthorized), it must be due to an invalid
-     * (probably expired) access key. For convenience, we patch every SDK call
-     * to delete the cached connection if we receive a 401 so the user can simply
+     * If the server returns `Unauthorized`, it must be due to an invalid
+     * (or expired) access key. For convenience, we patch every SDK call
+     * to delete the cached connection so the user can simply
      * login again instead of having to log out first.
      */
     Object.getOwnPropertyNames(AccountManager.prototype).forEach(function (functionName) {
@@ -1293,9 +1297,8 @@ function getSdk(accessKey, headers, customServerUrl, proxy) {
                 if (maybePromise && maybePromise.then !== undefined) {
                     maybePromise = maybePromise
                         .catch(function (error) {
-                        if (error.statusCode && error.statusCode === 401) {
+                        if (error.statusCode && error.statusCode === AccountManager.ERROR_UNAUTHORIZED) {
                             deleteConnectionInfoCache(false);
-                            error.message = "Invalid credentials. Run the 'code-push login' command to authenticate with the CodePush server.";
                         }
                         throw error;
                     });
